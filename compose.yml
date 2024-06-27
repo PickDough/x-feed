@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # roach-cert:
+  #   container_name: roach-cert
+  #   hostname: roach-cert
+  #   build:
+  #     context: cockroach
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - certs-roach-1:/certs/roach-1
+  #     - certs-roach-2:/certs/roach-2
+  #     - certs-client:/certs/client
+
+  roach-1:
+    container_name: roach-1
+    image: cockroachdb/cockroach:latest
+    hostname: roach-1
+    volumes:
+      - roach-1-data:/cockroach/cockroach-data
+      #- certs-roach-1:/certs
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    networks:
+      - cockroachnet
+    command: "start \
+      --advertise-addr=roach-1:26257 \
+      --http-addr=roach-1:8080 \
+      --insecure \
+      --join=roach-1,roach-2"
+
+  roach-2:
+    container_name: roach-2
+    image: cockroachdb/cockroach:latest
+    hostname: roach-2
+    volumes:
+      - roach-2-data:/cockroach/cockroach-data
+      #- certs-roach-2:/certs
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    networks:
+      - cockroachnet
+    command: "start \
+      --advertise-addr=roach-2:26257 \
+      --http-addr=roach-2:8080 \
+      --listen-addr=roach-2:26257 \
+      --insecure \
+      --join=roach-1,roach-2"
+    depends_on:
+      #- roach-cert
+      - roach-1
+  
+  roach-init:
+    container_name: roach-init
+    image: cockroachdb/cockroach:latest
+    depends_on:
+      #- roach-cert
+      - roach-1
+    networks:
+      - cockroachnet
+    command: init --insecure --host=roach-1 
+  
+  db-init:
+    container_name: db-init
+    image: cockroachdb/cockroach:latest
+    environment:
+      - DB_HOST=roach-1
+      #- CERTS=/certs
+    env_file:
+      - ./cockroach/.env
+    depends_on:
+      - roach-init
+      - roach-1
+    networks:
+      - cockroachnet
+    entrypoint: /bin/bash
+    command: /setup-db.sh
+    volumes:
+      - ./cockroach/setup-db.sh:/setup-db.sh
+  
+  api:
+    container_name: api
+    build:
+      dockerfile: Dockerfile
+    depends_on:
+      - db-init
+    networks:
+      - cockroachnet
+    ports:
+      - "3000:3000"
+
+
+volumes:
+  roach-1-data:
+  roach-2-data:
+  certs-roach-1:
+  certs-roach-2:
+  certs-client:
+
+networks:
+  cockroachnet:
+    driver: bridge
