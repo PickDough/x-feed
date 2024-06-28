@@ -3,6 +3,20 @@ name = "x-feed"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [".", "migration"]
+
+
 [dependencies]
+migration = { path = "migration" }
 actix-web = "4.8.0"
+dotenv = "0.15.0"
+dotenv_codegen = "0.15.0"
 postgres = "0.19.7"
+sea-orm = { version = "0.12.15", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+tokio = { version = "1.38.0", features = ["full"] }
+serde = "1.0.203"

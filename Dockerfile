@@ -4,12 +4,24 @@ FROM rust:bullseye as builder
 # Create a new empty shell project
 WORKDIR /x-feed
 
-# Copy our manifests
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./Cargo.toml ./Cargo.toml
 
+# Copy Cargo files
+COPY ./Cargo.toml .
+COPY ./Cargo.lock .
+COPY ./migration ./migration
+
+# Create fake main.rs file in src and build
+RUN mkdir ./src && echo 'fn main() { println!("Dummy!"); }' > ./src/main.rs
+RUN cargo build --release
+
+# Copy source files over
+RUN rm -rf ./src
 COPY ./src ./src
+COPY ./entity ./entity
 
+# The last modified attribute of main.rs needs to be updated manually,
+# otherwise cargo won't rebuild it.
+RUN touch -a -m ./src/main.rs
 # Now that the dependencies are built, copy your source code
 
 
