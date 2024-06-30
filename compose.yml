@@ -69,6 +69,7 @@ services:
   
   db-init:
     container_name: db-init
+    restart: on-failure
     image: cockroachdb/cockroach:latest
     environment:
       - DB_HOST=roach-1
@@ -85,7 +86,60 @@ services:
     volumes:
       - certs-client:/certs
       - ./cockroach/setup-db.sh:/setup-db.sh
-  
+
+  zoo1:
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zoo1
+    container_name: zoo1
+    networks:
+      - kafkanet
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_SERVERS: zoo1:2888:3888
+
+  kafka1:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka1
+    container_name: kafka1
+    networks:
+      - kafkanet
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: 'zoo1:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
+      KAFKA_MIN_INSYNC_REPLICAS: '1'
+    depends_on:
+      - zoo1
+
+  kafka-init:
+    image: confluentinc/cp-kafka:latest
+    restart: on-failure
+    networks:
+      - kafkanet
+    depends_on:
+      - kafka1
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka1:29092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka1:29092 --create --if-not-exists --topic message-topic --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka1:29092 --create --if-not-exists --topic message-topic --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka1:29092 --list
+      "
+
   api:
     container_name: api
     build:
@@ -94,9 +148,13 @@ services:
       - DATABASE_URL=postgres://roach:roach@roach-1:26257/twitter?sslmode=require&sslrootcert=/certs/ca.crt&sslcert=/certs/client.roach.crt&sslkey=/certs/client.roach.key
       - PORT=3000
     depends_on:
-      - db-init
+      db-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
     networks:
       - cockroachnet
+      - kafkanet
     ports:
       - "3000:3000"
     volumes:
@@ -112,4 +170,6 @@ volumes:
 
 networks:
   cockroachnet:
+    driver: bridge
+  kafkanet:
     driver: bridge

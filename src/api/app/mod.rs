@@ -1,3 +1,3 @@
 pub mod builder;
 
-mod message;
+pub mod message;

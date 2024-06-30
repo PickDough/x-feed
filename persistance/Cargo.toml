@@ -1,0 +1,21 @@
+[package]
+name = "persistance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "persistance"
+path = "src/lib.rs"
+
+[dependencies]
+model = { path = "../model" }
+entity = { path = "../entity" }
+sea-orm = { version = "0.12.15", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+tokio = { version = "1.38.0", features = ["full"] }
+futures = "0.3.30"
+tokio-stream = "0.1.15"

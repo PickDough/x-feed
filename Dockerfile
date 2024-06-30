@@ -9,6 +9,7 @@ WORKDIR /x-feed
 COPY ./Cargo.toml .
 COPY ./Cargo.lock .
 COPY ./migration ./migration
+COPY ./entity ./entity
 
 # Create fake main.rs file in src and build
 RUN mkdir ./src && echo 'fn main() { println!("Dummy!"); }' > ./src/main.rs
@@ -17,7 +18,6 @@ RUN cargo build --release
 # Copy source files over
 RUN rm -rf ./src
 COPY ./src ./src
-COPY ./entity ./entity
 
 # The last modified attribute of main.rs needs to be updated manually,
 # otherwise cargo won't rebuild it.
