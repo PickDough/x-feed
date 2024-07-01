@@ -1,22 +1,33 @@
-## Twitter feed back end
-Use docker-compose and any programming language
+## Usage
 
-1. Implement an endpoint to add message
-2. Implement an endpoint to get feed (get existing messages and stream new ones - use HTTP streaming)
-3. Implement back pressure for message creation (use RabbitMQ/Kafka)
-4. Use Cockroachdb(at least 2-node cluster) as a database
-5. Implement a bot to generate messages (at configurable speed)
-**CRITICAL** - Project must start with one command (bash file) without installing anything except docker
+```bash
+docker compose up # start all the containers
+```
 
+### POST `message`
 
-docker run -d 
-  --env COCKROACH_DATABASE=twitter 
-  --env COCKROACH_USER=roach 
-  --env COCKROACH_PASSWORD=roach 
-  --name=roach-single 
-  --hostname=roach-single 
-  -p 26257:26257 
-  -p 8080:8080 
-  -v "roach-single:/cockroach/cockroach-data"  
- cockroachdb/cockroach:latest start-single-node 
-  --http-addr=roach-single:8080
+```bash
+curl --location 'localhost:3000/message' \
+--header 'Content-Type: application/json' \
+--data '{"title": "rust", "text": "is too hard"}'
+```
+
+### GET `message`
+
+### http://localhost:3000/message 
+P.S. Я не знаю, як зазвичай тестуються `http streaming` ендпоінти, наприклад, у `Postman` дані не відображались, але якщо відкрити просто у `Firefox`, то вони відображатимуться та оновлюватимуться, а коли завершити сервіс, то вони всі покажуться як завершена відповідь.
+
+### Bot configuratiuon
+```rust
+/// A bot to spam the hell out of the feed api.
+struct Cli {
+    /// The url of the feed api.
+    url: String,
+    /// The time to wait between messages.
+    interval_ms: u64,
+}
+```
+Example:
+```bash
+./spam-bot -u http://api:3000/message -i 5000
+```

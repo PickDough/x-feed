@@ -10,6 +10,7 @@ services:
     volumes:
       - certs-roach-1:/certs/roach-1
       - certs-roach-2:/certs/roach-2
+      - certs-roach-3:/certs/roach-3
       - certs-client:/certs/client
 
   roach-1:
@@ -25,11 +26,12 @@ services:
     networks:
       - cockroachnet
     command: "start \
-      --advertise-addr=roach-1:26257 \
-      --http-addr=roach-1:8080 \
+      --store=roach-1 \
       --listen-addr=roach-1:26257 \
+      --http-addr=roach-1:8080 \
+      --advertise-addr=roach-1:26257 \
       --certs-dir=/certs \
-      --join=roach-1,roach-2"
+      --join=roach-1,roach-2,roach-3"
     depends_on:
       - roach-cert
 
@@ -46,15 +48,39 @@ services:
     networks:
       - cockroachnet
     command: "start \
-      --advertise-addr=roach-2:26257 \
-      --http-addr=roach-2:8080 \
+      --store=roach-2 \
       --listen-addr=roach-2:26257 \
+      --http-addr=roach-2:8080 \
+      --advertise-addr=roach-2:26257 \
       --certs-dir=/certs \
-      --join=roach-1,roach-2"
+      --join=roach-1,roach-2,roach-3"
     depends_on:
       - roach-cert
       - roach-1
-  
+
+  roach-3:
+    container_name: roach-3
+    image: cockroachdb/cockroach:latest
+    hostname: roach-3
+    volumes:
+      - roach-3-data:/cockroach/cockroach-data
+      - certs-roach-3:/certs
+    ports:
+      - "26259:26257"
+      - "8082:8080"
+    networks:
+      - cockroachnet
+    command: "start \
+      --store=roach-3 \
+      --listen-addr=roach-3:26257 \
+      --http-addr=roach-3:8080 \
+      --advertise-addr=roach-3:26257 \
+      --certs-dir=/certs \
+      --join=roach-1,roach-2,roach-3"
+    depends_on:
+      - roach-cert
+      - roach-1
+
   roach-init:
     container_name: roach-init
     image: cockroachdb/cockroach:latest
@@ -174,7 +200,7 @@ services:
     build:
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgres://roach:roach@roach-1:26257/twitter?sslmode=require&sslrootcert=/certs/ca.crt&sslcert=/certs/client.roach.crt&sslkey=/certs/client.roach.key
+      - DATABASE_URL=postgres://roach:roach@roach-2:26257/twitter?sslmode=require&sslrootcert=/certs/ca.crt&sslcert=/certs/client.roach.crt&sslkey=/certs/client.roach.key
       - KAFKA_URL=kafka1:29092
       - KAFKA_TOPIC=message-topic
       - SLEEP_TIME_MS=1000
@@ -201,21 +227,23 @@ services:
         condition: service_healthy
     command: ./spam-bot -u http://api:3000/message -i 3000
   
-  # bot-2:
-  #   build:
-  #     dockerfile: Dockerfile
-  #   networks:
-  #     - apinet
-  #   depends_on:
-  #     api:
-  #       condition: service_healthy
-  #   command: ./spam-bot -u http://api:3000/message -i 5000
+  bot-2:
+    build:
+      dockerfile: Dockerfile
+    networks:
+      - apinet
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ./spam-bot -u http://api:3000/message -i 5000
 
 volumes:
   roach-1-data:
   roach-2-data:
+  roach-3-data:
   certs-roach-1:
   certs-roach-2:
+  certs-roach-3:
   certs-client:
 
 networks:
