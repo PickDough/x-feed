@@ -31,3 +31,8 @@ Example:
 ```bash
 ./spam-bot -u http://api:3000/message -i 5000
 ```
+
+### Cockroach Panel
+
+### http://localhost:8080 
+### `Login: roach, Password: roach`
