@@ -2,7 +2,7 @@ use std::error::Error;
 use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 
-use entity::message::{self, ActiveModel, Entity as MessageEntity, Model};
+use entity::message::{self, ActiveModel, Entity as MessageEntity};
 use futures::Stream;
 use model::message::Message;
 use sea_orm::entity::prelude::*;
@@ -37,7 +37,7 @@ impl MessageReadDatabase {
                 MessageEntity::find()
                     .filter(
                         message::Column::Id
-                            .gt(atomic_id.load(std::sync::atomic::Ordering::Relaxed) as i32),
+                            .gt(atomic_id.load(std::sync::atomic::Ordering::Relaxed) as i64),
                     )
                     .limit(limit)
                     .all(&conn),
@@ -81,15 +81,25 @@ impl MessageStoreDatabase {
 }
 
 impl MessageStoreDatabase {
-    pub async fn post_message(&self, message: Message) -> Result<(), Box<dyn Error>> {
-        let mut active_model: ActiveModel = ActiveModel {
-            id: ActiveValue::NotSet,
-            title: ActiveValue::Set(message.title),
-            text: ActiveValue::Set(message.text),
-        };
-        active_model.id = ActiveValue::NotSet;
+    pub async fn post_messages(&self, messages: Vec<Message>) -> Result<(), Box<dyn Error>> {
+        let messages = messages
+            .into_iter()
+            .map(|m| {
+                let mut m = ActiveModel {
+                    id: ActiveValue::NotSet,
+                    title: ActiveValue::Set(m.title),
+                    text: ActiveValue::Set(m.text),
+                };
+                m.id = ActiveValue::NotSet;
 
-        let message = active_model.save(&self.conn).await;
+                m
+            })
+            .collect::<Vec<_>>();
+
+        let message = MessageEntity::insert_many(messages)
+            .on_empty_do_nothing()
+            .exec(&self.conn)
+            .await;
 
         message
             .map(|_| ())

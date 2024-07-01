@@ -12,6 +12,7 @@ use actix_web::Error;
 use messaging::message_producer::MessageProducer;
 use persistance::database::MessageReadDatabase;
 
+use super::health;
 use super::message;
 
 #[derive(Clone)]
@@ -34,6 +35,7 @@ pub fn build_app(
     let app = App::new()
         .service(message::fetch_message)
         .service(message::post_message)
+        .service(health::health)
         .app_data(web::Data::new(state));
 
     app

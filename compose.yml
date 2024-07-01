@@ -147,19 +147,69 @@ services:
     environment:
       - DATABASE_URL=postgres://roach:roach@roach-1:26257/twitter?sslmode=require&sslrootcert=/certs/ca.crt&sslcert=/certs/client.roach.crt&sslkey=/certs/client.roach.key
       - PORT=3000
+      - KAFKA_URL=kafka1:29092
+      - KAFKA_TOPIC=message-topic
     depends_on:
       db-init:
         condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
+    command: ./api
     networks:
       - cockroachnet
       - kafkanet
+      - apinet
     ports:
       - "3000:3000"
+    healthcheck:
+      test: curl --fail http://localhost:3000/health || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
     volumes:
       - certs-client:/certs
 
+  back-pressure:
+    build:
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgres://roach:roach@roach-1:26257/twitter?sslmode=require&sslrootcert=/certs/ca.crt&sslcert=/certs/client.roach.crt&sslkey=/certs/client.roach.key
+      - KAFKA_URL=kafka1:29092
+      - KAFKA_TOPIC=message-topic
+      - SLEEP_TIME_MS=1000
+      - RUST_BACKTRACE=1
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+    command: ./back-pressure 
+    networks:
+      - cockroachnet
+      - kafkanet
+    volumes:
+      - certs-client:/certs
+
+  bot-1:
+    build:
+      dockerfile: Dockerfile
+    networks:
+      - apinet
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ./spam-bot -u http://api:3000/message -i 3000
+  
+  # bot-2:
+  #   build:
+  #     dockerfile: Dockerfile
+  #   networks:
+  #     - apinet
+  #   depends_on:
+  #     api:
+  #       condition: service_healthy
+  #   command: ./spam-bot -u http://api:3000/message -i 5000
 
 volumes:
   roach-1-data:
@@ -172,4 +222,6 @@ networks:
   cockroachnet:
     driver: bridge
   kafkanet:
+    driver: bridge
+  apinet:
     driver: bridge

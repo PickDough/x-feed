@@ -1,8 +1,10 @@
 #![warn(unused_extern_crates)]
 mod app;
 
+use actix_web::middleware;
 use app::builder::AppState;
 use dotenv::dotenv;
+use env_logger::Env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -40,8 +42,12 @@ async fn main() -> std::io::Result<()> {
         )),
     };
 
-    HttpServer::new(move || app::builder::build_app(state.clone()))
-        .bind(("127.0.0.1", std::env::var("PORT").unwrap().parse().unwrap()))?
-        .run()
-        .await
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+
+    HttpServer::new(move || {
+        app::builder::build_app(state.clone()).wrap(middleware::Logger::default())
+    })
+    .bind(("0.0.0.0", std::env::var("PORT").unwrap().parse().unwrap()))?
+    .run()
+    .await
 }

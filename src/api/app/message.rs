@@ -26,7 +26,7 @@ async fn fetch_message(
     let message_stream = message_stream
         .map(|messages| {
             messages.map(|m| {
-                if (m.is_empty()) {
+                if m.is_empty() {
                     return web::Bytes::new();
                 }
                 web::Bytes::copy_from_slice(

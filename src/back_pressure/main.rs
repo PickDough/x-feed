@@ -1,7 +1,6 @@
 use dotenv::dotenv;
 use kafka::{client::FetchOffset, consumer::Consumer};
 use sea_orm::{ConnectOptions, Database};
-use std::str;
 
 #[tokio::main]
 async fn main() {
@@ -19,16 +18,28 @@ async fn main() {
         .create()
         .unwrap();
 
+    let sleep_time = std::env::var("SLEEP_TIME_MS")
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+
     loop {
         for ms in consumer.poll().unwrap().iter() {
-            for m in ms.messages() {
-                // If the consumer receives an event, this block is executed
-                println!("{:?}", str::from_utf8(m.value).unwrap());
-            }
+            let messages = ms
+                .messages()
+                .iter()
+                .map(|m| serde_json::from_slice(m.value).unwrap())
+                .collect();
+
+            store
+                .post_messages(messages)
+                .await
+                .expect("Failed to save messages");
 
             consumer.consume_messageset(ms).unwrap();
         }
 
-        consumer.commit_consumed().unwrap();
+        let _ = consumer.commit_consumed();
+        tokio::time::sleep(tokio::time::Duration::from_millis(sleep_time)).await;
     }
 }
